@@ -7,6 +7,7 @@ from typing import Dict, List
 
 import mlflow
 import pandas as pd
+from azureml.ai.monitoring import Collector
 from constants import INPUT_SAMPLE, OUTPUT_SAMPLE
 from inference_schema.parameter_types.standard_py_parameter_type import (
     StandardPythonParameterType,
@@ -21,7 +22,12 @@ LOGGER = logging.getLogger("root")
 
 def init() -> None:
     """Startup event handler to load an MLFLow model."""
-    global SERVICE_NAME, MODEL
+    global SERVICE_NAME, MODEL, INPUTS_COLLECTOR, OUTPUTS_COLLECTOR, INPUTS_OUTPUTS_COLLECTOR
+
+    # instantiate collectors
+    INPUTS_COLLECTOR = Collector(name='model_inputs')                    
+    OUTPUTS_COLLECTOR = Collector(name='model_outputs')
+    INPUTS_OUTPUTS_COLLECTOR = Collector(name='model_inputs_outputs')
 
     # Load MLFlow model
     SERVICE_NAME = "online/" + os.getenv("AZUREML_MODEL_DIR").split("/", 4)[-1]
@@ -44,15 +50,17 @@ def run(data: List[Dict]) -> str:
     """Perform scoring for every invocation of the endpoint"""
 
     try:
-        # Define UUID for the request
-        request_id = uuid.uuid4().hex
-
         # Append datetime column to predictions
         input_df = pd.DataFrame(data)
 
         # Preprocess payload and get model prediction
         model_output = MODEL.predict_proba(input_df)[:, 1].tolist()
 
+        # --- Custom Monitoring ---
+        
+        # Define UUID for the request
+        request_id = uuid.uuid4().hex
+        
         # Log input data
         LOGGER.info(
             json.dumps(
@@ -65,7 +73,7 @@ def run(data: List[Dict]) -> str:
             )
         )
 
-        # Log output data
+        Log output data
         LOGGER.info(
             json.dumps(
                 {
@@ -80,6 +88,24 @@ def run(data: List[Dict]) -> str:
         # Make response payload
         response_payload = json.dumps({"predictions": model_output})
 
+        # ----------------------------------
+
+        # --- Azure ML Native Monitoring ---
+        
+        # collect inputs data
+        context = INPUTS_COLLECTOR.collect(input_df)
+
+        # collect outputs data
+        OUTPUTS_COLLECTOR.collect(model_output, context)
+        
+        # create a dataframe with inputs/outputs joined - this creates a URI folder (not mltable) 
+        input_output_df = input_df.join(model_output)
+        
+        # collect both your inputs and output  
+        INPUTS_OUTPUTS_COLLECTOR.collect(input_output_df, context)
+
+        # ----------------------------------
+        
         return response_payload
 
     except Exception as error:
