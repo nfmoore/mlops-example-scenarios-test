@@ -12,8 +12,8 @@ app_insights_enabled: true
 data_collector:
   collections:
     model_inputs:
-      enabled: True
+      enabled: 'True'
     model_outputs:
-      enabled: True
+      enabled: 'True'
     model_inputs_outputs:
-      enabled: True
+      enabled: 'True'
