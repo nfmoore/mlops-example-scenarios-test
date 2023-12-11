@@ -4,7 +4,7 @@ code_configuration:
   code: ../../src
   scoring_script: online_score.py
 endpoint_name: credit-card-default-oe
-environment: azureml:credit-card-default-score-3:1
+environment: azureml:credit-card-default-score@latest
 model: azureml:credit-card-default@latest
 instance_type: Standard_F2s_v2
 instance_count: 1
