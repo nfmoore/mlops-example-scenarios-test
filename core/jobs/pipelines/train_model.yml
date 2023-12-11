@@ -85,7 +85,17 @@ jobs:
       max_total_trials: 8
       max_concurrent_trials: 4
       timeout: 1200
-    trial: ../components/sweep_trial.yml
+    trial:
+      code: ../../
+      environment: azureml:credit-card-default-train@latest
+      command: >-
+        python src/train.py 
+        --prepared_data_dir ${{inputs.prepared_data_dir}}
+        --random_state ${{search_space.random_state}}
+        --n_estimators ${{search_space.n_estimators}}
+        --max_depth ${{search_space.max_depth}}
+        --criterion ${{search_space.criterion}}
+        --model_output ${{outputs.model_output}}
 
   register_step:
     type: command
