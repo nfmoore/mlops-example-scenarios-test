@@ -25,9 +25,9 @@ def init() -> None:
     global SERVICE_NAME, MODEL, INPUTS_COLLECTOR, OUTPUTS_COLLECTOR, INPUTS_OUTPUTS_COLLECTOR
 
     # instantiate collectors
-    INPUTS_COLLECTOR = Collector(name='model_inputs')                    
-    OUTPUTS_COLLECTOR = Collector(name='model_outputs')
-    INPUTS_OUTPUTS_COLLECTOR = Collector(name='model_inputs_outputs')
+    INPUTS_COLLECTOR = Collector(name="model_inputs")
+    OUTPUTS_COLLECTOR = Collector(name="model_outputs")
+    INPUTS_OUTPUTS_COLLECTOR = Collector(name="model_inputs_outputs")
 
     # Load MLFlow model
     SERVICE_NAME = "online/" + os.getenv("AZUREML_MODEL_DIR").split("/", 4)[-1]
@@ -55,12 +55,13 @@ def run(data: List[Dict]) -> str:
 
         # Preprocess payload and get model prediction
         model_output = MODEL.predict_proba(input_df)[:, 1].tolist()
+        output_df = pd.DataFrame(model_output, columns=["predictions"])
 
         # --- Custom Monitoring ---
-        
+
         # Define UUID for the request
         request_id = uuid.uuid4().hex
-        
+
         # Log input data
         LOGGER.info(
             json.dumps(
@@ -73,7 +74,7 @@ def run(data: List[Dict]) -> str:
             )
         )
 
-        Log output data
+        # Log output data
         LOGGER.info(
             json.dumps(
                 {
@@ -91,21 +92,21 @@ def run(data: List[Dict]) -> str:
         # ----------------------------------
 
         # --- Azure ML Native Monitoring ---
-        
+
         # collect inputs data
         context = INPUTS_COLLECTOR.collect(input_df)
 
         # collect outputs data
-        OUTPUTS_COLLECTOR.collect(model_output, context)
-        
-        # create a dataframe with inputs/outputs joined - this creates a URI folder (not mltable) 
-        input_output_df = input_df.join(model_output)
-        
-        # collect both your inputs and output  
+        OUTPUTS_COLLECTOR.collect(output_df, context)
+
+        # create a dataframe with inputs/outputs joined - this creates a URI folder (not mltable)
+        input_output_df = input_df.join(output_df)
+
+        # collect both your inputs and output
         INPUTS_OUTPUTS_COLLECTOR.collect(input_output_df, context)
 
         # ----------------------------------
-        
+
         return response_payload
 
     except Exception as error:
